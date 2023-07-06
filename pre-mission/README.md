@@ -65,3 +65,94 @@ CSR은 사용자의 요청에 따라 HTML, CSS, JS와 같은 필요한 리소스
 SSR은 SPA에서 SEO, 초기 로딩 속도, 소셜 미리보기 등의 문제를 해결하고 성능을 개선할 수 있는 방법 중 하나입니다. 그러나 SSR은 서버 측에서 렌더링을 처리하므로 서버 리소스가 더 많이 사용되고 초기 구성과 개발 프로세스가 복잡해질 수 있다는 단점도 있습니다. 프로젝트의 요구 사항과 목표에 따라 SSR을 사용할지 여부를 결정하는 것이 중요합니다.
 
 ## Next.js 프로젝트에서 `yarn start(or npm run start)` 스크립트를 실행했을 때 실행되는 코드를 Next.js Github 레포지토리에서 찾은 뒤, 해당 파일에 대한 간단한 설명을 첨부해주세요.
+
+```typescript
+const validArgs: arg.Spec = {
+  // Types
+  '--help': Boolean,
+  '--port': Number,
+  '--hostname': String,
+  '--keepAliveTimeout': Number,
+
+  // Aliases
+  '-h': '--help',
+  '-p': '--port',
+  '-H': '--hostname',
+};
+let args: arg.Result<arg.Spec>;
+try {
+  args = arg(validArgs, { argv });
+} catch (error) {
+  if (isError(error) && error.code === 'ARG_UNKNOWN_OPTION') {
+    return printAndExit(error.message, 1);
+  }
+  throw error;
+}
+```
+
+next start의 옵션으로 올 수 있는 값을 명시합니다.
+명시한 옵션 이외에 값이 들어오면 에러를 프린트하고 실행을 멈춥니다.
+
+```typescript
+if (args['--help']) {
+  console.log(`
+   Description
+      Starts the application in production mode.
+      The application should be compiled with \`next build\` first.
+
+   Usage
+      $ next start <dir> -p <port>
+
+   <dir> represents the directory of the Next.js application.
+   If no directory is provided, the current directory will be used.
+
+   Options
+      --port, -p          A port number on which to start the application
+      --hostname, -H      Hostname on which to start the application (default: 0.0.0.0)
+      --keepAliveTimeout  Max milliseconds to wait before closing inactive connections
+      --help, -h          Displays this message
+   `);
+  process.exit(0);
+}
+```
+
+옵션으로 `--help`가 들어오면 console.log로 설명을 프린트하고 실행을 종료합니다.
+
+```typescript
+const dir = getProjectDir(args._[0]);
+const host = args['--hostname'];
+const port = getPort(args);
+
+const keepAliveTimeoutArg: number | undefined = args['--keepAliveTimeout'];
+if (
+  typeof keepAliveTimeoutArg !== 'undefined' &&
+  (Number.isNaN(keepAliveTimeoutArg) ||
+    !Number.isFinite(keepAliveTimeoutArg) ||
+    keepAliveTimeoutArg < 0)
+) {
+  printAndExit(
+    `Invalid --keepAliveTimeout, expected a non negative number but received "${keepAliveTimeoutArg}"`,
+    1,
+  );
+}
+
+const keepAliveTimeout = keepAliveTimeoutArg
+  ? Math.ceil(keepAliveTimeoutArg)
+  : undefined;
+```
+
+서버 실행에 필요한 dir, host, port 등을 입력받은 값 또는 기본 값으로 선언, 초기화한다.
+이때 --keepAliveTimeout의 값이 유효하지 않을 경우에는 에러를 프린트하고 실행을 종료합니다.
+
+```typescript
+await startServer({
+  dir,
+  isDev: false,
+  hostname: host,
+  port,
+  keepAliveTimeout,
+  useWorkers: !!config.experimental.appDir,
+});
+```
+
+startServer 함수를 통해 서버를 실행한다.
